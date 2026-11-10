@@ -1,0 +1,13 @@
+.env
+node_modules/
+*.o
+*.elf
+*.prx
+*.PBP
+*.SFO
+server/data/
+__pycache__/
+dist/
+upstream/
+native/upstream-source.tar
+native/test-results/

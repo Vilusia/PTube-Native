@@ -1,0 +1,9 @@
+*.sh text eol=lf
+*.py text eol=lf
+*.cmake text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.mjs text eol=lf
+*.png binary
+*.zip binary
+*.ttf binary

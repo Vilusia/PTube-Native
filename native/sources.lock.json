@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/kouminiku-9900/komi-tube.git",
+  "commit": "47bf5677a5254dfc37d8716233e7b1861c51698d",
+  "path": "upstream/komi-tube",
+  "engine_base_commit": "5a77720f31bf62007249ec458109da50ae7a5a05",
+  "pspdev_image": "pspdev/pspdev@sha256:ee385df3aa783189d5a033af5eb1d4a9cdd93718fb8bf652ec7bb48e54038a8b"
+}

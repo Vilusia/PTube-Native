@@ -1,0 +1,30 @@
+services:
+  ptube:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PTUBE_BIND:-127.0.0.1}:${PTUBE_PORT:-8080}:8080"
+    environment:
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      DAILY_SEARCH_LIMIT: ${DAILY_SEARCH_LIMIT:-40}
+      PTUBE_DEMO: ${PTUBE_DEMO:-1}
+      ENABLE_UNOFFICIAL_PLAYBACK: ${ENABLE_UNOFFICIAL_PLAYBACK:-0}
+    volumes:
+      - ptube-data:/data
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+volumes:
+  ptube-data:
