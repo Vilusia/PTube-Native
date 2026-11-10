@@ -1,5 +1,11 @@
 # Native PTube validation — 2026-11-09
 
+Build 6 adds cached battery/AC readings, saved power-mode selection and CPU
+clock policies. Portable power-policy tests cover busy-state boosts, playback
+floors, invalid mode fallback and menu/playback clock ordering. PSP hardware
+tests remain necessary for battery readings, saved settings, overlay layout,
+smooth playback in each mode and actual power savings.
+
 This is a hardware-test build, not a claim of complete YouTube compatibility.
 
 Build 4 adds a Discover home-menu entry, non-repeating random topic selection,

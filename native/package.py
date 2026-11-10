@@ -69,7 +69,7 @@ def main():
             'playback': 'Direct PSP HTTPS, H.264/AAC firmware decoding, 360p preference',
             'requires_vps': False, 'requires_data_api_key': False,
             'hardware_verified_here': False,
-            'build': 5,
+            'build': 6,
             'engine_local_patch': 'scheduler-error-overlap (bounded memmove)',
         }
         (app / 'BUILD-INFO.json').write_text(json.dumps(metadata, indent=2) + '\n')
@@ -91,7 +91,7 @@ def main():
                 if file.is_file():
                     output.write(file, file.relative_to(stage))
         print('Install archive:', archive)
-        shutil.copy2(archive, release / 'PTube-native-build5.zip')
+        shutil.copy2(archive, release / 'PTube-native-build6.zip')
     # Include the exact upstream sources and our build/adaptation code so the
     # linked libraries and frontend can be rebuilt rather than shipping a blob.
     upstream_archive = ROOT / 'native/upstream-source.tar'

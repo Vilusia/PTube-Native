@@ -25,6 +25,7 @@
 #include <pspctrl.h>
 #include <pspdisplay.h>
 #include <pspkernel.h>
+#include <psppower.h>
 #include <psputility.h>
 
 #include <stdbool.h>
@@ -41,12 +42,13 @@
 #include "komi_runtime.h"
 #include "../common/ptube_guard.h"
 #include "../common/ptube_recovery.h"
+#include "../common/ptube_power.h"
 #include "mylist.h"
 #include "osk.h"
 #include "search.h"
 #include "ui.h"
 
-PSP_MODULE_INFO("PTubeNative", PSP_MODULE_USER, 0, 5);
+PSP_MODULE_INFO("PTubeNative", PSP_MODULE_USER, 0, 6);
 PSP_MAIN_THREAD_PRIORITY(TILEFINCH_PSP_THREAD_PRIORITY_BROWSER);
 PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_USER | PSP_THREAD_ATTR_VFPU);
 PSP_MAIN_THREAD_STACK_SIZE_KB(2560);
@@ -109,6 +111,65 @@ static Mylist mylist;
 static Budget ui_budget;
 static bool load_cancelled;
 static int last_discover_topic = -1;
+static unsigned power_mode;
+static const char *const power_names[] = {"Performance", "Balanced", "Battery saver"};
+
+static void power_apply(bool playback, bool busy)
+{
+    static int applied;
+    int cpu = ptube_power_cpu(power_mode, playback, busy);
+    if (cpu == applied) return;
+    int result = scePowerSetClockFrequency(cpu, cpu, cpu / 2);
+    komi_result("power mode=%u playback=%d busy=%d cpu=%d result=0x%08x",
+                power_mode, playback, busy, cpu, (unsigned)result);
+    if (result >= 0) applied = cpu;
+    else {
+        power_mode = 0;
+        if (scePowerSetClockFrequency(333, 333, 166) >= 0) applied = 333;
+    }
+}
+
+static void power_load(void)
+{
+    char path[256];
+    komi_sibling_path(path, sizeof path, "ptube-power.txt");
+    FILE *file = fopen(path, "r");
+    unsigned value;
+    if (file != NULL) {
+        if (fscanf(file, "%u", &value) == 1 && value < 3) power_mode = value;
+        fclose(file);
+    }
+}
+
+static void power_cycle(void)
+{
+    power_mode = (power_mode + 1) % 3;
+    char path[256];
+    komi_sibling_path(path, sizeof path, "ptube-power.txt");
+    FILE *file = fopen(path, "w");
+    if (file != NULL) {
+        fprintf(file, "%u\n", power_mode);
+        fclose(file);
+    }
+    power_apply(false, false);
+}
+
+static void draw_battery(uint16_t *vram)
+{
+    static uint64_t checked;
+    static int percent = -1, plugged;
+    uint64_t now = komi_now_us();
+    if (checked == 0 || now - checked >= 5000000u) {
+        percent = scePowerGetBatteryLifePercent();
+        plugged = scePowerIsPowerOnline() > 0;
+        checked = now;
+    }
+    char label[24];
+    if (percent >= 0 && percent <= 100)
+        snprintf(label, sizeof label, "%s%d%%", plugged ? "AC " : "", percent);
+    else snprintf(label, sizeof label, "%s", plugged ? "AC" : "--%");
+    ui_text(vram, W - 80, 5, W - 4, label, 16, UI_TEXT);
+}
 
 /* Confirm/back, from the system setting. */
 static uint32_t BTN_OK = PSP_CTRL_CIRCLE;
@@ -211,7 +272,8 @@ static void draw_bars(uint16_t *vram, const char *title, const char *hints)
 {
     ui_fill(vram, 0, 0, W, TOP_BAR, UI_BAR);
     int x = ui_text(vram, 10, 5, 140, "PTube Native", 16, UI_ACCENT);
-    ui_text(vram, x + 12, 5, W - 10, title, 16, UI_TEXT);
+    ui_text(vram, x + 12, 5, W - 88, title, 16, UI_TEXT);
+    draw_battery(vram);
     ui_fill(vram, 0, H - HINT_BAR, W, HINT_BAR, UI_BAR);
     ui_text(vram, 8, H - HINT_BAR + 3, W - 4, hints, 16, UI_TEXT_MUTED);
 }
@@ -304,15 +366,17 @@ static void draw_screen(uint16_t *vram)
         snprintf(hint, sizeof hint, "%s Open  " UI_ICON_TRIANGLE
                  " Search  START Exit", ICON_OK);
         draw_bars(vram, "", hint);
-        static const char *const entries[] = {"Discover videos", "Search YouTube", "Bookmarks"};
-        for (int i = 0; i < 3; i++) {
-            int y = TOP_BAR + 22 + i * 52;
+        static const char *const entries[] = {"Discover videos", "Search YouTube", "Bookmarks", "Power"};
+        for (int i = 0; i < 4; i++) {
+            int y = TOP_BAR + 10 + i * 50;
             if (i == app.home_selection)
                 ui_fill(vram, 40, y, W - 80, 44, UI_ROW_SELECTED);
             char label[64];
             if (i == 2)
                 snprintf(label, sizeof label, "%s (%u videos)", entries[i],
                          (unsigned) mylist.count);
+            else if (i == 3)
+                snprintf(label, sizeof label, "Power: %s", power_names[power_mode]);
             else
                 snprintf(label, sizeof label, "%s", entries[i]);
             ui_text(vram, 64, y + 13, W - 60, label, 16, UI_TEXT);
@@ -409,6 +473,7 @@ static bool load_page(const char *url, const char *busy_title,
                       const char *busy_line, Page *page)
 {
     komi_result("load url=%.200s", url);
+    power_apply(false, true);
     char error[256] = {0};
     uint64_t started = komi_now_us();
     ptube_operation_begin(45);
@@ -808,7 +873,8 @@ static void player_overlay(uint16_t *vram, void *context)
         bool liked = mylist_find(&mylist, view->video->id) >= 0;
         int x = 10;
         if (liked) x = ui_text(vram, x, 5, W - 10, "♥ ", 16, UI_LIKED);
-        ui_text(vram, x, 5, W - 10, view->video->title, 16, UI_TEXT);
+        ui_text(vram, x, 5, W - 88, view->video->title, 16, UI_TEXT);
+        draw_battery(vram);
         ui_shade(vram, 0, H - 32, W, 32);
         char position[32], duration[32], line[80];
         format_time(position, sizeof position, ui->current_time_us);
@@ -862,6 +928,7 @@ static PlayerExit play_video_attempt(const YtVideo *video, const AutoPlay *autom
     *recovery_us = 0;
     PlayerExit exit = PLAYER_BACK;
     ptube_operation_begin(65);
+    power_apply(true, true);
     bool accepted = psp_media_open_provider_route(&komi.media, url,
                                                   ++app.generation);
     const char *outcome = accepted ? "closed" : "refused";
@@ -896,6 +963,7 @@ static PlayerExit play_video_attempt(const YtVideo *video, const AutoPlay *autom
             (void) psp_media_request_seek(&komi.media, target, false);
         }
         const PspUiMediaState *ui = &komi.media.ui;
+        power_apply(true, !ui->playing || ui->buffering);
         if (ui->playing && ui->current_time_us > 0)
             last_position = ui->current_time_us;
         /* Refresh destroys the old pipeline and resets its visible clock.
@@ -1003,6 +1071,7 @@ static PlayerExit play_video(const YtVideo *video, const AutoPlay *automatic)
         /* All resolver/decoder owners were closed above. Never delete or
            reuse a transport whose worker still owns a request. */
         ptube_operation_begin(15);
+        power_apply(false, true);
         fetch_background_transport_set_media_priority(false);
         bool stopped = fetch_background_transport_shutdown(3000);
         bool ready = stopped && fetch_background_transport_initialize(&komi.budget);
@@ -1181,7 +1250,8 @@ static void list_input(void)
 int main(int argc, char **argv)
 {
     komi_log_open(argc > 0 ? argv[0] : NULL, "ptube.log");
-    komi_result("start app version=5 safety=search-timeout-home-exit argv0=%s", komi.argv0);
+    komi_result("start app version=6 safety=search-timeout-home-exit argv0=%s", komi.argv0);
+    power_load();
     Config config;
     load_config(&config);
     komi_platform_init(false);
@@ -1227,17 +1297,20 @@ int main(int argc, char **argv)
     app.buttons = ~0u;
     for (;;) {
         komi_progress("menu");
+        power_apply(false, false);
         read_input();
         switch (app.screen) {
         case SCREEN_HOME:
             if (pressed(PSP_CTRL_START)) goto quit;
-            if (pressed(PSP_CTRL_UP)) app.home_selection = (app.home_selection + 2) % 3;
-            if (pressed(PSP_CTRL_DOWN)) app.home_selection = (app.home_selection + 1) % 3;
+            if (pressed(PSP_CTRL_UP)) app.home_selection = (app.home_selection + 3) % 4;
+            if (pressed(PSP_CTRL_DOWN)) app.home_selection = (app.home_selection + 1) % 4;
             if (pressed(PSP_CTRL_TRIANGLE)
                 || (pressed(BTN_OK) && app.home_selection == 1)) {
                 ask_and_search();
             } else if (pressed(BTN_OK) && app.home_selection == 0) {
                 open_discover();
+            } else if (pressed(BTN_OK) && app.home_selection == 3) {
+                power_cycle();
             } else if (pressed(BTN_OK)) {
                 app.screen = SCREEN_MYLIST;
                 app.mylist_selection = 0;

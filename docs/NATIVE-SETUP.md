@@ -1,5 +1,25 @@
 # PTube Native — direct YouTube test build
 
+## Build 6: battery display and power modes
+
+The header shows battery percentage (or `--%` when unavailable), with `AC`
+when external power is connected. During video playback it appears with the
+player overlay; press a button to show the overlay.
+
+On the home screen, select **Power** and press confirm to cycle modes:
+
+| Mode | Menus | Playback |
+| --- | --- | --- |
+| Performance (default) | 333 MHz | 333 MHz |
+| Balanced | 222 MHz | 266 MHz |
+| Battery saver | 111 MHz | 222 MHz |
+
+Loading, reconnecting and buffering temporarily use 333 MHz. Settings are saved
+in `ptube-power.txt`; the install ZIP does not replace that file. If a reduced
+clock causes uneven playback, choose Performance. Actual battery-life gains
+and playback at reduced clocks still need device testing. Screen brightness
+continues to use the PSP's own controls.
+
 This app adapts the MIT-licensed KOMI Tube frontend and its Tilefinch HTTPS,
 YouTube resolver and firmware media engine. Those projects supply the native
 playback implementation; this is not an independent rewrite. Full licences,

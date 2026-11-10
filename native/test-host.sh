@@ -16,6 +16,8 @@ cc -std=c11 -O2 -Wall -Wextra -Werror /work/native/tests/guard_test.c -o "$OUT/g
 "$OUT/guard_test"
 cc -std=c11 -O2 -Wall -Wextra -Werror /work/native/tests/recovery_test.c -o "$OUT/recovery_test"
 "$OUT/recovery_test"
+cc -std=c11 -O2 -Wall -Wextra -Werror /work/native/tests/power_test.c -o "$OUT/power_test"
+"$OUT/power_test"
 cc -std=c11 -O2 -Wall -Wextra -Werror /work/native/tests/discover_test.c /work/native/app/discover.c -o "$OUT/discover_test"
 "$OUT/discover_test"
 APP=/work/native/app

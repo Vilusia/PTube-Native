@@ -19,8 +19,8 @@ with zipfile.ZipFile(archive) as package:
     magic, version, *offsets = struct.unpack_from('<10I', data)
     assert magic == 0x50425000 and offsets == sorted(offsets) and offsets[-1] <= len(data)
     assert data[offsets[6]:offsets[6]+4] == b'\x7fELF'
-    assert b'start app version=5 safety=search-timeout-home-exit' in data
-    assert json.loads(package.read(prefix + 'BUILD-INFO.json'))['build'] == 5
+    assert b'start app version=6 safety=search-timeout-home-exit' in data
+    assert json.loads(package.read(prefix + 'BUILD-INFO.json'))['build'] == 6
     sfo = data[offsets[0]:offsets[1]]
     magic, version, keys, values, count = struct.unpack_from('<5I', sfo)
     assert magic == 0x46535000
